@@ -18,6 +18,7 @@
 #include <windows.h>
 #include <stdio.h>
 #include <malloc.h>
+#include <inttypes.h> /* strtoimax */
 
 #include "win32-dlfcn.h"
 
@@ -65,6 +66,23 @@ UTF8toWCHAR(
     }
 
     return outputString;
+}
+
+static 
+bool
+str_to_uint16(
+  const char* str, uint16_t* res
+)
+{
+  char* end;
+  errno = 0;
+  
+  intmax_t val = strtoimax(str, &end, 10);
+  
+  if (errno == ERANGE || val < 0 || val > UINT16_MAX || end == str || *end != '\0')
+    return false;
+  *res = (uint16_t) val;
+  return true;
 }
 
 /**
@@ -140,7 +158,14 @@ dlsym(
     const char* name    /** Name of exported symbol (ASCII). */
 )
 {
-    void* address = (void*) GetProcAddress((HMODULE) handle, name);
+    uint16_t ordinal;
+    void* address;
+    
+    if (str_to_uint16(name, &ordinal) == true){
+      address = (void*) GetProcAddress((HMODULE) handle, (LPCSTR)ordinal);
+    } else {
+      address = (void*) GetProcAddress((HMODULE) handle, name);
+    }
 
     if (address == NULL)
         lastError = GetLastError();
